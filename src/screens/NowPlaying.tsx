@@ -182,8 +182,10 @@ export default function NowPlayingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Queue, or the lyrics panel when the queue is closed */}
-        {showQueue ? (
+        {/* Up Next. Lyrics used to render here as a placeholder that only
+            ever showed the track title; it was removed rather than left as a
+            dead affordance. */}
+        {showQueue && (
           <BlurView intensity={20} tint="dark" style={styles.lyricsSnippet}>
             <View style={styles.queueHeader}>
               <Text style={styles.lyricsTitle}>Up Next</Text>
@@ -214,16 +216,6 @@ export default function NowPlayingScreen() {
                 ))}
               </ScrollView>
             )}
-          </BlurView>
-        ) : (
-          <BlurView intensity={20} tint="dark" style={styles.lyricsSnippet}>
-            <Text style={styles.lyricsTitle}>Lyrics</Text>
-            <Text style={styles.lyricsText}>
-              {currentTrack.album
-                ? `${currentTrack.title} — ${currentTrack.album}`
-                : currentTrack.title}
-            </Text>
-            <Text style={styles.lyricsText}>Lyrics aren't connected yet.</Text>
           </BlurView>
         )}
 

@@ -6,7 +6,25 @@ import {
 } from '../core/storage';
 import { Playlist, Track } from '../core/types';
 
+/** Optional and never required: 'unspecified' is a first-class answer. */
+export type Gender = 'male' | 'female' | 'unspecified';
+
+export type UserProfile = {
+  name: string;
+  gender: Gender;
+  /** True once the user has been through Get Started. */
+  completed: boolean;
+};
+
+export const DEFAULT_PROFILE: UserProfile = {
+  name: '',
+  gender: 'unspecified',
+  completed: false,
+};
+
 export type AppSettings = {
+  /** Local-only profile captured by Get Started. */
+  profile: UserProfile;
   /** User-supplied playback resolver endpoints. */
   resolverEndpoints: { url: string; kind: 'invidious' | 'piped' | 'custom' }[];
   volume: number;
@@ -17,10 +35,25 @@ export type AppSettings = {
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  profile: DEFAULT_PROFILE,
   resolverEndpoints: [],
   volume: 1,
   preferAudioOnly: true,
   autoplayRelated: true,
+};
+
+/**
+ * One listening session: this track was actually played, at this moment.
+ *
+ * Repeated plays are separate entries on purpose -- this is a history, not a
+ * "recently played" set, so playing something twice should show twice.
+ */
+export type HistoryEntry = {
+  /** Unique per entry, so repeated plays of one track never collide as keys. */
+  id: string;
+  track: Track;
+  /** Epoch ms when the listen crossed the threshold. */
+  playedAt: number;
 };
 
 export type SavedPlaybackState = {
@@ -29,6 +62,8 @@ export type SavedPlaybackState = {
 };
 
 const MAX_RECENTS = 50;
+/** History is a log, so it is bounded by count rather than de-duplicated. */
+const MAX_HISTORY = 300;
 
 /**
  * All locally-persisted user data: liked songs, playlists, recents, settings.
@@ -39,6 +74,7 @@ class LibraryServiceImpl {
   private likedIds = new Set<string>();
   private playlists: Playlist[] = [];
   private recents: Track[] = [];
+  private history: HistoryEntry[] = [];
   private settings: AppSettings = { ...DEFAULT_SETTINGS };
   private searchHistory: string[] = [];
 
@@ -48,11 +84,12 @@ class LibraryServiceImpl {
     if (this.loaded) return;
     this.loaded = true;
 
-    const [liked, playlists, recents, settings, history] = await Promise.all([
+    const [liked, playlists, recents, settings, listenHistory, history] = await Promise.all([
       readJson<Track[]>(STORAGE_KEYS.likedTracks, []),
       readJson<Playlist[]>(STORAGE_KEYS.playlists, []),
       readJson<Track[]>(STORAGE_KEYS.recentlyPlayed, []),
       readJson<Partial<AppSettings>>(STORAGE_KEYS.settings, {}),
+      readJson<HistoryEntry[]>(STORAGE_KEYS.history, []),
       readJson<string[]>(STORAGE_KEYS.searchHistory, []),
     ]);
 
@@ -60,8 +97,16 @@ class LibraryServiceImpl {
     this.likedIds = new Set(this.liked.map((t) => t.id));
     this.playlists = Array.isArray(playlists) ? playlists : [];
     this.recents = Array.isArray(recents) ? recents : [];
-    this.settings = { ...DEFAULT_SETTINGS, ...(settings ?? {}) };
+    const stored = settings ?? {};
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      ...stored,
+      // Nested, so merge it explicitly: a shallow spread would drop fields
+      // written by an older build.
+      profile: { ...DEFAULT_PROFILE, ...(stored.profile ?? {}) },
+    };
     this.searchHistory = Array.isArray(history) ? history : [];
+    this.history = Array.isArray(listenHistory) ? listenHistory : [];
   }
 
   // ---- liked songs ------------------------------------------------------
@@ -246,10 +291,70 @@ class LibraryServiceImpl {
     void writeJson(STORAGE_KEYS.searchHistory, []);
   }
 
+  /**
+   * Mark a playlist as recently accessed.
+   *
+   * Recency rides on the existing updatedAt field rather than a second list,
+   * so a recently opened playlist surfaces as a playlist -- not flattened into
+   * its individual tracks.
+   */
+  touchPlaylist(playlistId: string): void {
+    const index = this.playlists.findIndex((p) => p.id === playlistId);
+    if (index < 0) return; // 'liked' is synthetic and has no stored record
+
+    this.playlists[index] = { ...this.playlists[index], updatedAt: Date.now() };
+    writeJsonDebounced(STORAGE_KEYS.playlists, this.playlists, 800);
+  }
+
+  // ---- listening history ------------------------------------------------
+
+  getHistory(): HistoryEntry[] {
+    return [...this.history];
+  }
+
+  /**
+   * Record a real listen. Called only once a track has genuinely been playing
+   * for a while -- tapping a track and skipping it immediately must not count.
+   */
+  recordListen(track: Track): HistoryEntry {
+    const entry: HistoryEntry = {
+      id: `${track.id}:${Date.now()}`,
+      track: stripStream(track),
+      playedAt: Date.now(),
+    };
+
+    this.history = [entry, ...this.history].slice(0, MAX_HISTORY);
+    writeJsonDebounced(STORAGE_KEYS.history, this.history, 1000);
+    return entry;
+  }
+
+  clearHistory(): void {
+    this.history = [];
+    writeJsonDebounced(STORAGE_KEYS.history, this.history, 200);
+  }
+
   // ---- settings ---------------------------------------------------------
 
   getSettings(): AppSettings {
     return { ...this.settings };
+  }
+
+  getProfile(): UserProfile {
+    return { ...this.settings.profile };
+  }
+
+  /** True once Get Started has been completed. */
+  hasProfile(): boolean {
+    return this.settings.profile.completed;
+  }
+
+  saveProfile(patch: Partial<UserProfile>): UserProfile {
+    this.settings = {
+      ...this.settings,
+      profile: { ...this.settings.profile, ...patch },
+    };
+    void writeJson(STORAGE_KEYS.settings, this.settings);
+    return this.getProfile();
   }
 
   updateSettings(patch: Partial<AppSettings>): AppSettings {

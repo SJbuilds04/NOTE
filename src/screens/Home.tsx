@@ -41,7 +41,7 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const [activeCategory, setActiveCategory] = useState('Music');
   const { playTrack, currentTrack, isPlaying, togglePlayPause, isLoading } = usePlayer();
-  const { recentlyPlayed, liked } = useLibrary();
+  const { recentlyPlayed, liked, profile } = useLibrary();
 
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [featured, setFeatured] = useState<Track[]>([]);
@@ -126,7 +126,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{greetingFor(new Date().getHours())}</Text>
-            <Text style={styles.name}>Sanyam.</Text>
+            {!!profile.name && <Text style={styles.name}>{profile.name}.</Text>}
           </View>
           <Image
             source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop' }}

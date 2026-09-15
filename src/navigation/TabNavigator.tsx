@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Search, Library } from 'lucide-react-native';
+import { Home, Search, Library, Clock } from 'lucide-react-native';
 import { COLORS } from '../constants/theme';
 
 // Placeholder screens
 import HomeScreen from '../screens/Home';
 import SearchScreen from '../screens/Search';
 import LibraryScreen from '../screens/Library';
+import HistoryScreen from '../screens/History';
 
 const Tab = createBottomTabNavigator();
 
@@ -41,6 +42,16 @@ export const TabNavigator = () => {
           tabBarLabel: 'Search',
           tabBarIcon: ({ color, focused }) => (
             <Search color={color} size={24} strokeWidth={focused ? 2.5 : 2} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="HistoryTab"
+        component={HistoryScreen}
+        options={{
+          tabBarLabel: 'History',
+          tabBarIcon: ({ color, focused }) => (
+            <Clock color={color} size={24} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />

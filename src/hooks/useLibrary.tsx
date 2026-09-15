@@ -10,13 +10,23 @@ import React, {
 import { messageFor } from '../core/errors';
 import { Playlist, Track } from '../core/types';
 import { endpointSource } from '../providers/stream/StreamResolver';
-import { AppSettings, LibraryService } from '../services/LibraryService';
+import {
+  AppSettings,
+  HistoryEntry,
+  LibraryService,
+  UserProfile,
+} from '../services/LibraryService';
 import { MusicService } from '../services/MusicService';
 
 type LibraryContextType = {
   liked: Track[];
   playlists: Playlist[];
   recentlyPlayed: Track[];
+  /** Listening log, newest first. */
+  history: HistoryEntry[];
+  clearHistory: () => void;
+  /** Mark a playlist as recently accessed, so it sorts to the top. */
+  touchPlaylist: (playlistId: string) => void;
   settings: AppSettings;
   isLoaded: boolean;
 
@@ -37,6 +47,10 @@ type LibraryContextType = {
 
   updateSettings: (patch: Partial<AppSettings>) => void;
 
+  /** Local-only profile from Get Started. */
+  profile: UserProfile;
+  saveProfile: (patch: Partial<UserProfile>) => void;
+
   /** The synthetic "Liked Songs" playlist the UI shows alongside real ones. */
   likedPlaylist: Playlist;
 };
@@ -47,6 +61,7 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [liked, setLiked] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [recentlyPlayed, setRecentlyPlayed] = useState<Track[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [settings, setSettings] = useState<AppSettings>(LibraryService.getSettings());
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -57,8 +72,30 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     setLiked(LibraryService.getLiked());
     setPlaylists(LibraryService.getPlaylists());
     setRecentlyPlayed(LibraryService.getRecentlyPlayed());
+    setHistory(LibraryService.getHistory());
     setSettings(LibraryService.getSettings());
   }, []);
+
+  const touchPlaylist = useCallback(
+    (playlistId: string) => {
+      LibraryService.touchPlaylist(playlistId);
+      sync();
+    },
+    [sync]
+  );
+
+  const clearHistory = useCallback(() => {
+    LibraryService.clearHistory();
+    sync();
+  }, [sync]);
+
+  const saveProfile = useCallback(
+    (patch: Partial<UserProfile>) => {
+      LibraryService.saveProfile(patch);
+      sync();
+    },
+    [sync]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -220,6 +257,9 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       liked,
       playlists,
       recentlyPlayed,
+      history,
+      clearHistory,
+      touchPlaylist,
       settings,
       isLoaded,
       isLiked,
@@ -234,12 +274,18 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       importError,
       clearImportError: () => setImportError(null),
       updateSettings,
+
+      profile: settings.profile,
+      saveProfile,
       likedPlaylist,
     }),
     [
       liked,
       playlists,
       recentlyPlayed,
+      history,
+      clearHistory,
+      touchPlaylist,
       settings,
       isLoaded,
       isLiked,
@@ -253,6 +299,7 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
       importing,
       importError,
       updateSettings,
+      saveProfile,
       likedPlaylist,
     ]
   );

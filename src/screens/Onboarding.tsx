@@ -11,6 +11,7 @@ const { width, height } = Dimensions.get('window');
 
 type RootStackParamList = {
   Main: undefined;
+  ProfileSetup: undefined;
 };
 
 export default function OnboardingScreen() {
@@ -46,7 +47,7 @@ export default function OnboardingScreen() {
           <TouchableOpacity 
             style={styles.button}
             activeOpacity={0.8}
-            onPress={() => navigation.replace('Main')}
+            onPress={() => navigation.replace('ProfileSetup')}
           >
             <Text style={styles.buttonText}>Get Started</Text>
             <View style={styles.iconCircle}>

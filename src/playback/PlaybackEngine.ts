@@ -59,6 +59,8 @@ export class PlaybackEngine {
   private completionFired = false;
 
   private configured = false;
+  /** Whether the media session/notification is currently attached. */
+  private lockScreenActive = false;
 
   on<K extends keyof EngineEvents>(event: K, handler: EngineEvents[K]): void {
     this.listeners[event] = handler;
@@ -255,24 +257,63 @@ export class PlaybackEngine {
       /* already torn down */
     }
 
+    this.clearLockScreen();
+
     this.status = { ...IDLE_STATUS, volume: this.desiredVolume };
     this.listeners.onStatus?.(this.status);
   }
 
-  /** Native lock-screen / notification controls. */
+  /**
+   * Native lock-screen / notification controls.
+   *
+   * expo-audio owns the single MediaSession; NØTE must not create a second one.
+   * Play/pause, the scrub bar and seek +/-10s are handled inside that session
+   * and act directly on this same player, so the engine stays the one source of
+   * truth and no command has to round-trip through JS.
+   *
+   * Next/previous are deliberately absent: expo-audio's AudioMediaSessionCallback
+   * removes COMMAND_SEEK_TO_NEXT / COMMAND_SEEK_TO_PREVIOUS (and the MEDIA_ITEM
+   * variants) from the session, and exposes no JS event for them. See the
+   * limitation noted in the Phase 3 report.
+   */
   private setLockScreenMetadata(track: Track): void {
     if (Platform.OS === 'web') return;
 
+    const metadata = {
+      title: track.title,
+      artist: track.artist.name,
+      albumTitle: track.album,
+      artworkUrl: track.albumImageUrl || undefined,
+    };
+
     try {
-      this.player?.setActiveForLockScreen(true, {
-        title: track.title,
-        artist: track.artist.name,
-        albumTitle: track.album,
-        artworkUrl: track.albumImageUrl || undefined,
+      if (this.lockScreenActive) {
+        // Already attached: just swap the metadata, so the session (and the
+        // notification) is not torn down and rebuilt on every track change.
+        this.player?.updateLockScreenMetadata(metadata);
+        return;
+      }
+
+      this.player?.setActiveForLockScreen(true, metadata, {
+        showSeekForward: true,
+        showSeekBackward: true,
       });
+      this.lockScreenActive = true;
     } catch {
       // Lock screen controls are optional; never block playback on them.
     }
+  }
+
+  /** Tear down the notification/session when playback is genuinely over. */
+  private clearLockScreen(): void {
+    if (Platform.OS === 'web' || !this.lockScreenActive) return;
+
+    try {
+      this.player?.clearLockScreenControls();
+    } catch {
+      /* best effort */
+    }
+    this.lockScreenActive = false;
   }
 
   get trackId(): string | null {
@@ -281,6 +322,7 @@ export class PlaybackEngine {
 
   async release(): Promise<void> {
     this.clearLoadTimer();
+    this.clearLockScreen();
     this.subscription?.remove();
     this.subscription = null;
 

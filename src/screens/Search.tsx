@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search as SearchIcon, Mic, X } from 'lucide-react-native';
@@ -50,6 +51,8 @@ export default function SearchScreen() {
   /** Playing a search result queues the whole result list behind it. */
   const onPlayTrack = useCallback(
     (track: Track) => {
+      // The result has been chosen; the user is done typing.
+      Keyboard.dismiss();
       playTrack(track, {
         tracks: results.tracks,
         label: `Search • ${results.query}`,
@@ -66,7 +69,8 @@ export default function SearchScreen() {
       name: string,
       kind: 'album' | 'playlist'
     ) => {
-    setExpandingId(id);
+      Keyboard.dismiss();
+      setExpandingId(id);
     try {
       const page =
         kind === 'album'
@@ -87,7 +91,8 @@ export default function SearchScreen() {
 
   const onOpenArtist = useCallback(
     async (id: string, browseId: string, name: string) => {
-    setExpandingId(id);
+      Keyboard.dismiss();
+      setExpandingId(id);
     try {
       const tracks = await MusicService.getArtistTracks(browseId);
       if (tracks.length) playTrack(tracks[0], { tracks, label: name });
