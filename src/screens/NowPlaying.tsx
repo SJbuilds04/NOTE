@@ -8,7 +8,6 @@ import {
   Dimensions,
   ActivityIndicator,
   ScrollView,
-  GestureResponderEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronDown, MoreHorizontal, Heart, Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, MonitorSpeaker, Share, ListMusic, X } from 'lucide-react-native';
@@ -16,7 +15,8 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { PlaybackSourceSheet } from '../components/player/PlaybackSourceSheet';
-import { usePlayer, useProgress } from '../hooks/usePlayer';
+import { SeekBar } from '../components/player/SeekBar';
+import { usePlayer } from '../hooks/usePlayer';
 import { useLibrary } from '../hooks/useLibrary';
 import { useNavigation } from '@react-navigation/native';
 
@@ -57,34 +57,14 @@ export default function NowPlayingScreen() {
   } = usePlayer();
 
   const { isLiked, toggleLike } = useLibrary();
-  const { position, duration } = useProgress();
   const [showQueue, setShowQueue] = useState(false);
   const [showSource, setShowSource] = useState(false);
-  /** Geometry of the progress track, measured so taps can map to a time. */
-  const [barWidth, setBarWidth] = useState(0);
-  const [barX, setBarX] = useState(0);
 
   if (!currentTrack) return null;
 
-  const progress = duration > 0 ? Math.min(1, Math.max(0, position / duration)) : 0;
-  const progressPercent: `${number}%` = `${progress * 100}%`;
-  const remaining = Math.max(0, duration - position);
   const liked = isLiked(currentTrack.id);
   const busy = isLoading || isBuffering;
 
-  /** Tap anywhere on the bar to seek there. */
-  const onSeekPress = (e: GestureResponderEvent) => {
-    if (!duration || !barWidth) return;
-
-    // locationX is not populated by every platform/event path, so fall back to
-    // the page coordinate minus the bar's measured offset.
-    const { locationX, pageX } = e.nativeEvent;
-    const x = Number.isFinite(locationX) ? locationX : pageX - barX;
-    if (!Number.isFinite(x)) return;
-
-    const ratio = Math.min(1, Math.max(0, x / barWidth));
-    seekTo(ratio * duration);
-  };
 
   return (
     <View style={styles.container}>
@@ -138,36 +118,10 @@ export default function NowPlayingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Progress */}
-        {/* The track is measured on this View: onLayout is reliable on a plain
-            View, and the bar below is a full-width child of it. */}
-        <View
-          style={styles.progressContainer}
-          onLayout={(e) => {
-            setBarWidth(e.nativeEvent.layout.width);
-            setBarX(e.nativeEvent.layout.x);
-          }}
-        >
-          {/* A scrubber, not a button: the raw responder API reports the touch
-              position directly and keeps reporting it while the finger moves,
-              so the bar can be dragged. hitSlop gives the 4px-tall track a
-              usable touch target without changing how it looks. */}
-          <View
-            style={styles.progressBarBg}
-            hitSlop={{ top: 20, bottom: 20, left: 0, right: 0 }}
-            onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={() => true}
-            onResponderGrant={onSeekPress}
-            onResponderMove={onSeekPress}
-          >
-            <View style={[styles.progressBarFill, { width: progressPercent }]} />
-            <View style={[styles.progressDot, { left: progressPercent }]} />
-          </View>
-          <View style={styles.timeContainer}>
-            <Text style={styles.timeText}>{formatTime(position)}</Text>
-            <Text style={styles.timeText}>-{formatTime(remaining)}</Text>
-          </View>
-        </View>
+        {/* Progress. SeekBar owns its own measurement, gesture handling and
+            position subscription, so this screen no longer re-renders on every
+            playback tick. */}
+        <SeekBar onSeek={seekTo} />
 
         {/* Error state -- never leaves the player stuck */}
         {error && (
@@ -350,38 +304,6 @@ const styles = StyleSheet.create({
   trackArtist: {
     fontFamily: FONTS.regular,
     fontSize: 16,
-    color: COLORS.text.secondary,
-  },
-  progressContainer: {
-    marginBottom: SIZES.lg,
-  },
-  progressBarBg: {
-    height: 4,
-    backgroundColor: COLORS.player.progressTrack,
-    borderRadius: 2,
-    marginBottom: SIZES.sm,
-    justifyContent: 'center',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: COLORS.text.primary,
-    borderRadius: 2,
-  },
-  progressDot: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: COLORS.text.primary,
-    marginLeft: -6,
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  timeText: {
-    fontFamily: FONTS.regular,
-    fontSize: 12,
     color: COLORS.text.secondary,
   },
   controlsContainer: {
