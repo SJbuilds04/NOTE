@@ -93,6 +93,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const loadId = useRef(0);
   /** The track we most recently attempted, for retry(). */
   const lastAttempt = useRef<{ track: Track; position: number } | null>(null);
+  /** Which track the in-flight load belongs to, so we never abort our own. */
+  const loadingTrackId = useRef<string | null>(null);
   /**
    * Consecutive tracks auto-skipped because they would not play. Bounded so a
    * queue full of dead videos stops instead of racing to the end.
@@ -120,12 +122,28 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
 
       const id = ++loadId.current;
-      loadAbort.current?.abort();
+
+      // Only abort the previous load if it was for a DIFFERENT track. Aborting
+      // a load of this same track would kill the shared in-flight resolve that
+      // this load is about to join (double-tap on a row does exactly that).
+      if (loadingTrackId.current !== track.id) {
+        loadAbort.current?.abort();
+      }
+
       const controller = new AbortController();
       loadAbort.current = controller;
+      loadingTrackId.current = track.id;
 
-      // Whatever we were warming is no longer the next thing to play.
-      preloader.cancel();
+      const preloadedThis = preloader.pending === track.id;
+
+      // Stop warming anything that is no longer next -- but if we were warming
+      // THIS track, adopt that request instead of aborting it: resolveStream
+      // below will be handed the very same in-flight promise.
+      preloader.adopt(track.id);
+
+      if (__DEV__) {
+        console.log('[playback] load', track.title, '| preloaded:', preloadedThis);
+      }
 
       setCurrentTrack(track);
       setError(null);
@@ -141,6 +159,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
         setIsLoading(false);
         autoSkips.current = 0;
+        loadingTrackId.current = null;
+        if (__DEV__) console.log('[playback] started', track.title);
         LibraryService.recordPlay(track);
 
         // Warm exactly one track ahead, so pressing skip is instant.
@@ -150,7 +170,9 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
         // Always leave the loading state, whatever went wrong.
         setIsLoading(false);
+        loadingTrackId.current = null;
         const err = toAppError(e, 'playback_failed');
+        if (__DEV__) console.log('[playback] FAILED', track.title, '|', err.kind, '|', err.detail ?? '');
 
         // A dead stream URL should not be reused on retry.
         if (err.kind !== 'network' && err.kind !== 'timeout') {
@@ -166,6 +188,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
         if (skippable && autoSkips.current < MAX_AUTO_SKIPS && queueRef.current.hasNext) {
           autoSkips.current += 1;
+          if (__DEV__) console.log('[playback] auto-skip', autoSkips.current, 'past', track.title);
           queueRef.current.next(false);
           bumpQueue();
           persistQueue();
