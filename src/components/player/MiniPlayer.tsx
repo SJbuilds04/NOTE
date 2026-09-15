@@ -15,6 +15,27 @@ interface MiniPlayerProps {
   isLoading?: boolean;
 }
 
+/**
+ * Only this subtree subscribes to playback position.
+ *
+ * useProgress fires ~4x a second. Reading it in MiniPlayer itself re-rendered
+ * the artwork and both Text nodes on every tick; isolating it here keeps the
+ * bar live while the rest of the bar stays still.
+ */
+const MiniPlayerProgress: React.FC = React.memo(() => {
+  const { position, duration } = useProgress();
+
+  const progressPercent =
+    duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
+
+  return (
+    <View style={styles.progressTrack}>
+      <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+    </View>
+  );
+});
+MiniPlayerProgress.displayName = 'MiniPlayerProgress';
+
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({ 
   track, 
   isPlaying, 
@@ -23,11 +44,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   tabBarHeight = Platform.OS === 'ios' ? 88 : 68,
   isLoading = false
 }) => {
-  const { position, duration } = useProgress();
   const [showSource, setShowSource] = useState(false);
-  
-  const progressPercent =
-    duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
+
 
   if (!track) return null;
 
@@ -66,9 +84,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
         </View>
         
         {/* Progress Bar */}
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
-        </View>
+        <MiniPlayerProgress />
       </View>
 
       <PlaybackSourceSheet visible={showSource} onClose={() => setShowSource(false)} />

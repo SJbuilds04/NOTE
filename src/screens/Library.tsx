@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -17,7 +17,7 @@ import { GlassCard } from '../components/common/GlassCard';
 import { TrackRow } from '../components/lists/TrackRow';
 import { MiniPlayer } from '../components/player/MiniPlayer';
 import { StatusBarScrim } from '../components/common/StatusBarScrim';
-import { Playlist } from '../core/types';
+import { Playlist, Track } from '../core/types';
 import { usePlayer } from '../hooks/usePlayer';
 import { useLibrary } from '../hooks/useLibrary';
 import { useNavigation } from '@react-navigation/native';
@@ -82,6 +82,13 @@ export default function LibraryScreen() {
       albums: [...albums.values()].sort((x, y) => y.count - x.count),
     };
   }, [liked, playlists, recentlyPlayed]);
+
+  /** Stable per-playlist handler, so expanded rows keep their memoization. */
+  const makeTrackPressHandler = useCallback(
+    (playlist: Playlist) => (track: Track) =>
+      playTrack(track, { tracks: playlist.tracks, label: playlist.name }),
+    [playTrack]
+  );
 
   const onPlayPlaylist = (playlist: Playlist) => {
     if (!playlist.tracks.length) return;
@@ -220,12 +227,7 @@ export default function LibraryScreen() {
                         <TrackRow
                           key={track.id}
                           track={track}
-                          onPress={() =>
-                            playTrack(track, {
-                              tracks: playlist.tracks,
-                              label: playlist.name,
-                            })
-                          }
+                          onPress={makeTrackPressHandler(playlist)}
                           isPlaying={currentTrack?.id === track.id && isPlaying}
                         />
                       ))

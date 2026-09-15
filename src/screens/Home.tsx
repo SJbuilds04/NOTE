@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -103,16 +103,26 @@ export default function HomeScreen() {
     playTrack(featured[0], { tracks: featured, label: 'A calmer you' });
   }, [featured, playTrack]);
 
-  const listTracks = hasRecents ? recentlyPlayed.slice(0, 3) : starter;
+  const listTracks = useMemo(
+    () => (hasRecents ? recentlyPlayed.slice(0, 3) : starter),
+    [hasRecents, recentlyPlayed, starter]
+  );
+
+  // One stable callback for the whole list instead of a closure per row.
+  const handleTrackPress = useCallback(
+    (track: Track) => {
+      playTrack(track, {
+        tracks: listTracks,
+        label: hasRecents ? 'Recently Played' : 'Start Listening',
+      });
+    },
+    [playTrack, listTracks, hasRecents]
+  );
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingTop: insets.top + SIZES.lg, paddingBottom: SIZES.bottomInset }
-        ]}
-      >
+      {/* Pinned: greeting + search stay put while the rest of the page scrolls. */}
+      <View style={[styles.stickyHeader, { paddingTop: insets.top + SIZES.lg }]}>
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{greetingFor(new Date().getHours())}</Text>
@@ -132,7 +142,15 @@ export default function HomeScreen() {
           <Search color={COLORS.text.secondary} size={20} />
           <Text style={styles.searchText}>Search for songs, artists, or more...</Text>
         </TouchableOpacity>
+      </View>
 
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: SIZES.bottomInset }
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.pillsContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {CATEGORIES.map(cat => (
@@ -194,12 +212,7 @@ export default function HomeScreen() {
               <TrackRow
                 key={track.id}
                 track={track}
-                onPress={() =>
-                  playTrack(track, {
-                    tracks: listTracks,
-                    label: hasRecents ? 'Recently Played' : 'Start Listening',
-                  })
-                }
+                onPress={handleTrackPress}
                 isPlaying={currentTrack?.id === track.id && isPlaying}
               />
             ))
@@ -243,6 +256,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: SIZES.md,
+  },
+  stickyHeader: {
+    paddingHorizontal: SIZES.md,
+    paddingBottom: SIZES.sm,
+    backgroundColor: COLORS.background,
+    zIndex: 20,
   },
   header: {
     flexDirection: 'row',
