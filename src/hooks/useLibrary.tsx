@@ -97,6 +97,10 @@ export const LibraryProvider: React.FC<{ children: ReactNode }> = ({ children })
     [sync]
   );
 
+  // Playback writes recents and listening history directly on the service;
+  // without this the History tab would only update after an app reload.
+  useEffect(() => LibraryService.subscribe(sync), [sync]);
+
   useEffect(() => {
     let cancelled = false;
 
