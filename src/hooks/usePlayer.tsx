@@ -14,6 +14,7 @@ import { RepeatMode, Track } from '../core/types';
 import { flushWrites, readJson, writeJsonDebounced, STORAGE_KEYS } from '../core/storage';
 import { playbackEngine, IDLE_STATUS, PlaybackStatus } from '../playback/PlaybackEngine';
 import { Queue, QueueSnapshot, EMPTY_QUEUE } from '../playback/queue';
+import { preloader } from '../playback/preload';
 import { endpointSource } from '../providers/stream/StreamResolver';
 import { LibraryService } from '../services/LibraryService';
 import { MusicService } from '../services/MusicService';
@@ -61,6 +62,9 @@ type PlayerContextType = {
   canPlayCurrent: boolean;
 };
 
+/** How many unplayable tracks in a row we step over before giving up. */
+const MAX_AUTO_SKIPS = 3;
+
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 /**
@@ -89,6 +93,11 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const loadId = useRef(0);
   /** The track we most recently attempted, for retry(). */
   const lastAttempt = useRef<{ track: Track; position: number } | null>(null);
+  /**
+   * Consecutive tracks auto-skipped because they would not play. Bounded so a
+   * queue full of dead videos stops instead of racing to the end.
+   */
+  const autoSkips = useRef(0);
 
   const bumpQueue = useCallback(() => setQueueVersion((v) => v + 1), []);
 
@@ -115,6 +124,9 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const controller = new AbortController();
       loadAbort.current = controller;
 
+      // Whatever we were warming is no longer the next thing to play.
+      preloader.cancel();
+
       setCurrentTrack(track);
       setError(null);
       setIsLoading(true);
@@ -128,25 +140,44 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (id !== loadId.current) return;
 
         setIsLoading(false);
+        autoSkips.current = 0;
         LibraryService.recordPlay(track);
 
-        // Warm the next track so pressing skip is instant.
-        MusicService.prefetchStream(queueRef.current.peekNext());
+        // Warm exactly one track ahead, so pressing skip is instant.
+        preloader.schedule(queueRef.current.peekNext());
       } catch (e) {
         if (id !== loadId.current) return;
 
         // Always leave the loading state, whatever went wrong.
         setIsLoading(false);
         const err = toAppError(e, 'playback_failed');
-        setError(messageFor(err));
 
         // A dead stream URL should not be reused on retry.
         if (err.kind !== 'network' && err.kind !== 'timeout') {
           MusicService.invalidateStream(track);
         }
+
+        // A track that simply cannot play should not strand the queue: step
+        // over it and keep going. Network failures are NOT skipped -- the
+        // next track would fail identically, so the error is shown instead.
+        const skippable = err.kind === 'track_unavailable' ||
+          err.kind === 'region_restricted' ||
+          err.kind === 'source_unavailable';
+
+        if (skippable && autoSkips.current < MAX_AUTO_SKIPS && queueRef.current.hasNext) {
+          autoSkips.current += 1;
+          queueRef.current.next(false);
+          bumpQueue();
+          persistQueue();
+          void loadCurrent({ autoPlay: true });
+          return;
+        }
+
+        autoSkips.current = 0;
+        setError(messageFor(err));
       }
     },
-    []
+    [bumpQueue, persistQueue]
   );
 
   // ---- engine wiring ----------------------------------------------------
@@ -174,6 +205,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
 
     return () => {
+      preloader.cancel();
       void playbackEngine.release();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -257,10 +289,14 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // ---- persist playback position ---------------------------------------
 
+  // Position ticks ~4x a second but is persisted in whole seconds, so only
+  // react when the second actually changes.
+  const positionSecond = Math.floor(status.position);
+
   useEffect(() => {
     if (!currentTrack) return;
-    LibraryService.savePlayback(currentTrack.id, status.position);
-  }, [currentTrack, status.position]);
+    LibraryService.savePlayback(currentTrack.id, positionSecond);
+  }, [currentTrack, positionSecond]);
 
   // Flush pending writes when the app goes to the background or the tab closes.
   useEffect(() => {
@@ -391,7 +427,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       persistQueue();
 
       if (wasEmpty) void loadCurrent({ autoPlay: true });
-      else MusicService.prefetchStream(queueRef.current.peekNext());
+      else preloader.schedule(queueRef.current.peekNext());
     },
     [bumpQueue, loadCurrent, persistQueue]
   );
@@ -445,7 +481,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     queueRef.current.toggleShuffle();
     bumpQueue();
     persistQueue();
-    MusicService.prefetchStream(queueRef.current.peekNext());
+    preloader.schedule(queueRef.current.peekNext());
   }, [bumpQueue, persistQueue]);
 
   const cycleRepeat = useCallback(() => {

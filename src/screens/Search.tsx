@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -17,7 +17,7 @@ import { TrackRow } from '../components/lists/TrackRow';
 import { MiniPlayer } from '../components/player/MiniPlayer';
 import { StatusBarScrim } from '../components/common/StatusBarScrim';
 import { BROWSE_CATEGORIES } from '../data/catalog';
-import { SearchFilter } from '../core/types';
+import { SearchFilter, Track } from '../core/types';
 import { useSearch } from '../hooks/useSearch';
 import { usePlayer } from '../hooks/usePlayer';
 import { MusicService } from '../services/MusicService';
@@ -48,20 +48,24 @@ export default function SearchScreen() {
   const isBrowsing = query.trim().length === 0;
 
   /** Playing a search result queues the whole result list behind it. */
-  const onPlayTrack = (index: number) => {
-    playTrack(results.tracks[index], {
-      tracks: results.tracks,
-      label: `Search • ${results.query}`,
-    });
-  };
+  const onPlayTrack = useCallback(
+    (track: Track) => {
+      playTrack(track, {
+        tracks: results.tracks,
+        label: `Search • ${results.query}`,
+      });
+    },
+    [playTrack, results.tracks, results.query]
+  );
 
   /** Tapping an album/playlist expands it and plays it as a queue. */
-  const onOpenCollection = async (
-    id: string,
-    browseId: string,
-    name: string,
-    kind: 'album' | 'playlist'
-  ) => {
+  const onOpenCollection = useCallback(
+    async (
+      id: string,
+      browseId: string,
+      name: string,
+      kind: 'album' | 'playlist'
+    ) => {
     setExpandingId(id);
     try {
       const page =
@@ -74,22 +78,87 @@ export default function SearchScreen() {
       }
     } catch {
       // The inline error row below already covers failed lookups.
-    } finally {
-      setExpandingId(null);
-    }
-  };
+      } finally {
+        setExpandingId(null);
+      }
+    },
+    [playTrack]
+  );
 
-  const onOpenArtist = async (id: string, browseId: string, name: string) => {
+  const onOpenArtist = useCallback(
+    async (id: string, browseId: string, name: string) => {
     setExpandingId(id);
     try {
       const tracks = await MusicService.getArtistTracks(browseId);
       if (tracks.length) playTrack(tracks[0], { tracks, label: name });
-    } catch {
-      /* handled by the error row */
-    } finally {
-      setExpandingId(null);
-    }
-  };
+      } catch {
+        /* handled by the error row */
+      } finally {
+        setExpandingId(null);
+      }
+    },
+    [playTrack]
+  );
+
+  // Synthetic Track objects for non-track results. Memoized because a new
+  // object literal per render would defeat TrackRow’s memoization.
+  const artistRows = useMemo(
+    () =>
+      results.artists.map((artist) => ({
+        id: artist.id,
+        title: artist.name,
+        artist: { id: artist.id, name: artist.subtitle ?? 'Artist' },
+        albumImageUrl: artist.imageUrl,
+        duration: 0,
+        provider: artist.provider,
+        sourceId: artist.browseId,
+      })),
+    [results.artists]
+  );
+
+  const albumRows = useMemo(
+    () =>
+      results.albums.map((album) => ({
+        id: album.id,
+        title: album.title,
+        artist: {
+          id: album.id,
+          name: album.year ? `${album.artist} • ${album.year}` : album.artist,
+        },
+        albumImageUrl: album.coverImageUrl,
+        duration: 0,
+        provider: album.provider,
+        sourceId: album.browseId,
+      })),
+    [results.albums]
+  );
+
+  const playlistRows = useMemo(
+    () =>
+      results.playlists.map((playlist) => ({
+        id: playlist.id,
+        title: playlist.name,
+        artist: { id: playlist.id, name: playlist.creator },
+        albumImageUrl: playlist.coverImageUrl,
+        duration: 0,
+        provider: playlist.provider,
+        sourceId: playlist.browseId,
+      })),
+    [results.playlists]
+  );
+
+  const openArtistRow = useCallback(
+    (track: Track) => onOpenArtist(track.id, track.sourceId, track.title),
+    [onOpenArtist]
+  );
+  const openAlbumRow = useCallback(
+    (track: Track) => onOpenCollection(track.id, track.sourceId, track.title, 'album'),
+    [onOpenCollection]
+  );
+  const openPlaylistRow = useCallback(
+    (track: Track) => onOpenCollection(track.id, track.sourceId, track.title, 'playlist'),
+    [onOpenCollection]
+  );
 
   return (
     <View style={styles.container}>
@@ -185,11 +254,11 @@ export default function SearchScreen() {
               <>
                 <Text style={styles.sectionTitle}>Songs</Text>
                 <View style={styles.resultsList}>
-                  {results.tracks.map((track, index) => (
+                  {results.tracks.map((track) => (
                     <TrackRow
                       key={track.id}
                       track={track}
-                      onPress={() => onPlayTrack(index)}
+                      onPress={onPlayTrack}
                       isPlaying={currentTrack?.id === track.id && isPlaying}
                     />
                   ))}
@@ -201,20 +270,12 @@ export default function SearchScreen() {
               <>
                 <Text style={styles.sectionTitle}>Artists</Text>
                 <View style={styles.resultsList}>
-                  {results.artists.map((artist) => (
+                  {artistRows.map((row) => (
                     <TrackRow
-                      key={artist.id}
-                      track={{
-                        id: artist.id,
-                        title: artist.name,
-                        artist: { id: artist.id, name: artist.subtitle ?? 'Artist' },
-                        albumImageUrl: artist.imageUrl,
-                        duration: 0,
-                        provider: artist.provider,
-                        sourceId: artist.browseId,
-                      }}
-                      onPress={() => onOpenArtist(artist.id, artist.browseId, artist.name)}
-                      isLoading={expandingId === artist.id}
+                      key={row.id}
+                      track={row}
+                      onPress={openArtistRow}
+                      isLoading={expandingId === row.id}
                     />
                   ))}
                 </View>
@@ -225,25 +286,12 @@ export default function SearchScreen() {
               <>
                 <Text style={styles.sectionTitle}>Albums</Text>
                 <View style={styles.resultsList}>
-                  {results.albums.map((album) => (
+                  {albumRows.map((row) => (
                     <TrackRow
-                      key={album.id}
-                      track={{
-                        id: album.id,
-                        title: album.title,
-                        artist: {
-                          id: album.id,
-                          name: album.year ? `${album.artist} • ${album.year}` : album.artist,
-                        },
-                        albumImageUrl: album.coverImageUrl,
-                        duration: 0,
-                        provider: album.provider,
-                        sourceId: album.browseId,
-                      }}
-                      onPress={() =>
-                        onOpenCollection(album.id, album.browseId, album.title, 'album')
-                      }
-                      isLoading={expandingId === album.id}
+                      key={row.id}
+                      track={row}
+                      onPress={openAlbumRow}
+                      isLoading={expandingId === row.id}
                     />
                   ))}
                 </View>
@@ -254,27 +302,12 @@ export default function SearchScreen() {
               <>
                 <Text style={styles.sectionTitle}>Playlists</Text>
                 <View style={styles.resultsList}>
-                  {results.playlists.map((playlist) => (
+                  {playlistRows.map((row) => (
                     <TrackRow
-                      key={playlist.id}
-                      track={{
-                        id: playlist.id,
-                        title: playlist.name,
-                        artist: { id: playlist.id, name: playlist.creator },
-                        albumImageUrl: playlist.coverImageUrl,
-                        duration: 0,
-                        provider: playlist.provider,
-                        sourceId: playlist.browseId,
-                      }}
-                      onPress={() =>
-                        onOpenCollection(
-                          playlist.id,
-                          playlist.browseId,
-                          playlist.name,
-                          'playlist'
-                        )
-                      }
-                      isLoading={expandingId === playlist.id}
+                      key={row.id}
+                      track={row}
+                      onPress={openPlaylistRow}
+                      isLoading={expandingId === row.id}
                     />
                   ))}
                 </View>
