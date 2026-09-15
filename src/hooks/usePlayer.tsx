@@ -62,6 +62,16 @@ type PlayerContextType = {
   canPlayCurrent: boolean;
 };
 
+/**
+ * How long a track must actually play before it counts as a listen.
+ *
+ * Tapping a track and skipping it immediately is not listening, so history is
+ * gated on real playback rather than on intent. Short tracks use a proportion
+ * instead, so a 30s clip is not excluded by a fixed threshold.
+ */
+const HISTORY_MIN_SECONDS = 20;
+const HISTORY_MIN_RATIO = 0.25;
+
 /** How many unplayable tracks in a row we step over before giving up. */
 const MAX_AUTO_SKIPS = 3;
 
@@ -100,6 +110,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
    * queue full of dead videos stops instead of racing to the end.
    */
   const autoSkips = useRef(0);
+  /** Load id whose listen has already been written to history. */
+  const historyWrittenFor = useRef<number | null>(null);
 
   const bumpQueue = useCallback(() => setQueueVersion((v) => v + 1), []);
 
@@ -135,6 +147,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       loadingTrackId.current = track.id;
 
       const preloadedThis = preloader.pending === track.id;
+      historyWrittenFor.current = null;
 
       // Stop warming anything that is no longer next -- but if we were warming
       // THIS track, adopt that request instead of aborting it: resolveStream
@@ -319,7 +332,25 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     if (!currentTrack) return;
     LibraryService.savePlayback(currentTrack.id, positionSecond);
-  }, [currentTrack, positionSecond]);
+
+    // A listen is logged once, mid-playback, not on tap and not on finish --
+    // so skipping away early leaves no trace, and a track abandoned near the
+    // end still counts.
+    if (historyWrittenFor.current === loadId.current) return;
+
+    const trackDuration = status.duration || currentTrack.duration || 0;
+
+    const threshold = Math.min(
+      HISTORY_MIN_SECONDS,
+      trackDuration > 0 ? trackDuration * HISTORY_MIN_RATIO : HISTORY_MIN_SECONDS
+    );
+
+    if (positionSecond >= threshold && positionSecond > 0) {
+      historyWrittenFor.current = loadId.current;
+      LibraryService.recordListen(currentTrack);
+      if (__DEV__) console.log('[history] logged', currentTrack.title);
+    }
+  }, [currentTrack, positionSecond, status.duration]);
 
   // Flush pending writes when the app goes to the background or the tab closes.
   useEffect(() => {

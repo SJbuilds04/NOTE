@@ -21,12 +21,18 @@ import { Playlist, Track } from '../core/types';
 import { usePlayer } from '../hooks/usePlayer';
 import { useLibrary } from '../hooks/useLibrary';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+type LibraryStackParams = {
+  Playlist: { playlistId: string };
+  NowPlaying: undefined;
+};
 
 const FILTERS = ['Playlists', 'Artists', 'Albums', 'Downloaded'];
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<LibraryStackParams>>();
   const [activeFilter, setActiveFilter] = useState('Playlists');
   const { playTrack, currentTrack, isPlaying, togglePlayPause, isLoading } = usePlayer();
   const {
@@ -39,16 +45,27 @@ export default function LibraryScreen() {
     importError,
     clearImportError,
     deletePlaylist,
+    touchPlaylist,
   } = useLibrary();
 
   const [showImport, setShowImport] = useState(false);
   const [importUrl, setImportUrl] = useState('');
-  /** The playlist whose tracks are expanded inline. */
-  const [openId, setOpenId] = useState<string | null>(null);
+  /** Playlists have their own page, so a tap navigates rather than expanding. */
+  const openPlaylist = useCallback(
+    (playlist: Playlist) => {
+      touchPlaylist(playlist.id);
+      navigation.navigate('Playlist', { playlistId: playlist.id });
+    },
+    [navigation, touchPlaylist]
+  );
 
   // "Liked Songs" always leads, then the user's own and imported playlists.
   const allPlaylists = useMemo<Playlist[]>(
-    () => [likedPlaylist, ...playlists],
+    () => [
+      likedPlaylist,
+      // Most recently opened or changed first, so recents read as playlists.
+      ...[...playlists].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)),
+    ],
     [likedPlaylist, playlists]
   );
 
@@ -83,12 +100,6 @@ export default function LibraryScreen() {
     };
   }, [liked, playlists, recentlyPlayed]);
 
-  /** Stable per-playlist handler, so expanded rows keep their memoization. */
-  const makeTrackPressHandler = useCallback(
-    (playlist: Playlist) => (track: Track) =>
-      playTrack(track, { tracks: playlist.tracks, label: playlist.name }),
-    [playTrack]
-  );
 
   const onPlayPlaylist = (playlist: Playlist) => {
     if (!playlist.tracks.length) return;
@@ -185,7 +196,7 @@ export default function LibraryScreen() {
                 <TouchableOpacity
                   style={styles.playlistRow}
                   activeOpacity={0.7}
-                  onPress={() => setOpenId(openId === playlist.id ? null : playlist.id)}
+                  onPress={() => openPlaylist(playlist)}
                   onLongPress={() => onPlayPlaylist(playlist)}
                 >
                   {playlist.coverImageUrl && playlist.coverImageUrl !== 'liked_songs_gradient' ? (
@@ -213,27 +224,6 @@ export default function LibraryScreen() {
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
-
-                {openId === playlist.id && (
-                  <View style={styles.expandedTracks}>
-                    {playlist.tracks.length === 0 ? (
-                      <Text style={styles.emptyHint}>
-                        {playlist.id === 'liked'
-                          ? 'Tap the heart on a track to save it here.'
-                          : 'This playlist is empty.'}
-                      </Text>
-                    ) : (
-                      playlist.tracks.map(track => (
-                        <TrackRow
-                          key={track.id}
-                          track={track}
-                          onPress={makeTrackPressHandler(playlist)}
-                          isPlaying={currentTrack?.id === track.id && isPlaying}
-                        />
-                      ))
-                    )}
-                  </View>
-                )}
               </View>
             ))}
 
@@ -287,7 +277,7 @@ export default function LibraryScreen() {
           isPlaying={isPlaying}
           isLoading={isLoading}
           onPlayPause={togglePlayPause}
-          onPress={() => navigation.navigate('NowPlaying' as never)}
+          onPress={() => navigation.navigate('NowPlaying')}
         />
       )}
     </View>

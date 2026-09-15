@@ -85,4 +85,5 @@ export const STORAGE_KEYS = {
   settings: 'settings',
   searchHistory: 'search-history',
   cache: 'cache',
+  history: 'history',
 } as const;
