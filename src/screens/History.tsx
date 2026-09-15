@@ -148,7 +148,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SIZES.md,
+    paddingLeft: SIZES.md,
+    // Leave room for the floating settings button pinned top-right.
+    paddingRight: SIZES.xxl + SIZES.lg,
     paddingBottom: SIZES.md,
   },
   title: {

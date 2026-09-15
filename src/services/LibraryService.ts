@@ -75,14 +75,32 @@ class LibraryServiceImpl {
   private playlists: Playlist[] = [];
   private recents: Track[] = [];
   private history: HistoryEntry[] = [];
+
+  /**
+   * Notified whenever library data changes from OUTSIDE the React hook --
+   * playback records listens and plays, which the UI must see without
+   * waiting for an app reload.
+   */
+  private changeListeners = new Set<() => void>();
   private settings: AppSettings = { ...DEFAULT_SETTINGS };
   private searchHistory: string[] = [];
 
-  private loaded = false;
+  /**
+   * The in-flight load, shared by every caller.
+   *
+   * A boolean guard is not enough here: it would have to be set before the
+   * reads finish, so a second caller arriving mid-load would be told loading
+   * was done and would read defaults. Handing everyone the same promise means
+   * they all wait for the same completed state.
+   */
+  private loadPromise: Promise<void> | null = null;
 
-  async load(): Promise<void> {
-    if (this.loaded) return;
-    this.loaded = true;
+  load(): Promise<void> {
+    if (!this.loadPromise) this.loadPromise = this.performLoad();
+    return this.loadPromise;
+  }
+
+  private async performLoad(): Promise<void> {
 
     const [liked, playlists, recents, settings, listenHistory, history] = await Promise.all([
       readJson<Track[]>(STORAGE_KEYS.likedTracks, []),
@@ -107,6 +125,18 @@ class LibraryServiceImpl {
     };
     this.searchHistory = Array.isArray(history) ? history : [];
     this.history = Array.isArray(listenHistory) ? listenHistory : [];
+  }
+
+  /** Subscribe to out-of-band changes. Returns an unsubscribe function. */
+  subscribe(listener: () => void): () => void {
+    this.changeListeners.add(listener);
+    return () => {
+      this.changeListeners.delete(listener);
+    };
+  }
+
+  private notifyChanged(): void {
+    for (const listener of this.changeListeners) listener();
   }
 
   // ---- liked songs ------------------------------------------------------
@@ -253,6 +283,7 @@ class LibraryServiceImpl {
       MAX_RECENTS
     );
     writeJsonDebounced(STORAGE_KEYS.recentlyPlayed, this.recents, 1000);
+    this.notifyChanged();
   }
 
   // ---- playback position ------------------------------------------------
@@ -304,6 +335,7 @@ class LibraryServiceImpl {
 
     this.playlists[index] = { ...this.playlists[index], updatedAt: Date.now() };
     writeJsonDebounced(STORAGE_KEYS.playlists, this.playlists, 800);
+    this.notifyChanged();
   }
 
   // ---- listening history ------------------------------------------------
@@ -325,6 +357,7 @@ class LibraryServiceImpl {
 
     this.history = [entry, ...this.history].slice(0, MAX_HISTORY);
     writeJsonDebounced(STORAGE_KEYS.history, this.history, 1000);
+    this.notifyChanged();
     return entry;
   }
 
