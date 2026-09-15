@@ -1,0 +1,32 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.notenative'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.notenative"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  compileOptions {
+    // NewPipeExtractor uses java.time, which is API 26+. The app declares
+    // minSdk 24, so the desugared backport is required for correctness on
+    // Android 7.x. See plugins/withCoreLibraryDesugaring.js for the app side.
+    coreLibraryDesugaringEnabled true
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // NewPipe Extractor -- GPL-3.0-or-later, (c) Team NewPipe.
+  // Consumed as an unmodified binary dependency. See THIRD_PARTY_NOTICES.md.
+  implementation 'com.github.TeamNewPipe:NewPipeExtractor:v0.26.5'
+
+  coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+}
