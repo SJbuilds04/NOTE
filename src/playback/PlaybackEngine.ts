@@ -84,6 +84,11 @@ export class PlaybackEngine {
         shouldPlayInBackground: true,
         interruptionMode: 'doNotMix',
       });
+
+      // release() deactivates the audio session, and setting the mode does not
+      // bring it back. Re-activating explicitly is what lets the engine play
+      // again after a teardown.
+      await setIsAudioActiveAsync(true);
     } catch {
       // Audio mode is a best-effort optimisation, never a reason to fail.
     }
@@ -323,6 +328,13 @@ export class PlaybackEngine {
   async release(): Promise<void> {
     this.clearLoadTimer();
     this.clearLockScreen();
+
+    // The audio session is about to be deactivated, so the next player must
+    // reconfigure it. Without this the engine silently never plays again: a
+    // new player is created and reports "started", but the session it needs is
+    // still inactive, so playback sits at 0. Fast Refresh unmounts and
+    // remounts the provider in development, which hits this on every edit.
+    this.configured = false;
     this.subscription?.remove();
     this.subscription = null;
 
