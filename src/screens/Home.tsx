@@ -328,12 +328,8 @@ const styles = StyleSheet.create({
     padding: SIZES.lg,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 140,
+    alignItems: 'center',
     marginBottom: SIZES.md,
-    // Inset from the page gutter so the card reads as a distinct element
-    // rather than running edge to edge like the rows below it.
-    marginHorizontal: SIZES.md,
   },
   featuredContent: {
     justifyContent: 'center',
