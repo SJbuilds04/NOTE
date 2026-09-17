@@ -17,6 +17,46 @@ export const BROWSE_CATEGORIES: Category[] = [
   { id: 'c8', name: 'Rock', color: '#B22222', query: 'rock classics' },
 ];
 
+/**
+ * Query pools for the Home quick actions.
+ *
+ * Each tap picks one at random so the tile does not return the same list
+ * every time. Liked is absent because it plays from the local library.
+ */
+export const ACTION_QUERIES: Record<string, string[]> = {
+  discover: [
+    'trending songs this week',
+    'viral hits right now',
+    'top global chart songs',
+    'new music this month',
+    'breakout artists 2026',
+    'most played songs today',
+  ],
+  chill: [
+    'chill relaxing songs',
+    'lofi chill beats',
+    'acoustic chill playlist',
+    'calm indie chill',
+    'soft rnb chill',
+    'sunset chill mix',
+  ],
+  focus: [
+    'focus instrumental concentration',
+    'deep focus study music',
+    'ambient focus no lyrics',
+    'piano focus instrumental',
+    'minimal techno focus',
+    'nature focus soundscape',
+  ],
+};
+
+/** A random query for a quick action, or null when it has no pool. */
+export function randomQueryFor(actionId: string): string | null {
+  const pool = ACTION_QUERIES[actionId];
+  if (!pool || pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 /** The quick-action tiles on Home, each backed by a real query. */
 export const QUICK_ACTIONS = [
   { id: 'liked', label: 'Liked', query: null },

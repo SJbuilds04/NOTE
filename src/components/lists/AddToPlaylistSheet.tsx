@@ -1,7 +1,6 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,7 +8,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Check, Heart, ListMusic, Plus, X } from 'lucide-react-native';
@@ -32,12 +30,36 @@ type Props = {
  */
 export const AddToPlaylistSheet: React.FC<Props> = ({ track, onClose }) => {
   const insets = useSafeAreaInsets();
-  const { playlists, addToPlaylist, createPlaylist, toggleLike, isLiked } = useLibrary();
+  const {
+    playlists,
+    addToPlaylist,
+    removeFromPlaylist,
+    createPlaylist,
+    toggleLike,
+    isLiked,
+  } = useLibrary();
 
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
-  /** Playlists this track was just added to, for inline confirmation. */
-  const [added, setAdded] = useState<string[]>([]);
+
+  /**
+   * Keyboard height, applied as bottom inset on the sheet.
+   *
+   * KeyboardAvoidingView is unreliable inside a Modal on Android, so the sheet
+   * is lifted explicitly by however much the keyboard actually covers.
+   */
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) =>
+      setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const liked = track ? isLiked(track.id) : false;
 
@@ -51,17 +73,17 @@ export const AddToPlaylistSheet: React.FC<Props> = ({ track, onClose }) => {
     Keyboard.dismiss();
     setCreating(false);
     setNewName('');
-    setAdded([]);
     onClose();
   }, [onClose]);
 
-  const addTo = useCallback(
-    (playlistId: string) => {
+  /** Tapping a playlist toggles membership: add if absent, remove if present. */
+  const toggleIn = useCallback(
+    (playlistId: string, alreadyIn: boolean) => {
       if (!track) return;
-      addToPlaylist(playlistId, track);
-      setAdded((prev) => (prev.includes(playlistId) ? prev : [...prev, playlistId]));
+      if (alreadyIn) removeFromPlaylist(playlistId, track.id);
+      else addToPlaylist(playlistId, track);
     },
-    [track, addToPlaylist]
+    [track, addToPlaylist, removeFromPlaylist]
   );
 
   const createAndAdd = useCallback(() => {
@@ -85,12 +107,16 @@ export const AddToPlaylistSheet: React.FC<Props> = ({ track, onClose }) => {
     >
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={close} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.avoider}
-        pointerEvents="box-none"
+      <View
+        style={[
+          styles.sheet,
+          {
+            paddingBottom:
+              keyboardHeight > 0 ? SIZES.lg : insets.bottom + SIZES.lg,
+            bottom: keyboardHeight,
+          },
+        ]}
       >
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + SIZES.lg }]}>
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.title}>Add to playlist</Text>
@@ -158,17 +184,14 @@ export const AddToPlaylistSheet: React.FC<Props> = ({ track, onClose }) => {
           </TouchableOpacity>
 
           {ordered.map((playlist) => {
-            const alreadyIn =
-              added.includes(playlist.id) ||
-              playlist.tracks.some((t) => t.id === track?.id);
+            const alreadyIn = playlist.tracks.some((t) => t.id === track?.id);
 
             return (
               <TouchableOpacity
                 key={playlist.id}
                 style={styles.row}
                 activeOpacity={0.7}
-                onPress={() => addTo(playlist.id)}
-                disabled={alreadyIn}
+                onPress={() => toggleIn(playlist.id, alreadyIn)}
               >
                 <View style={styles.rowIcon}>
                   <ListMusic color={COLORS.text.primary} size={20} />
@@ -194,7 +217,6 @@ export const AddToPlaylistSheet: React.FC<Props> = ({ track, onClose }) => {
           )}
         </ScrollView>
       </View>
-      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -208,13 +230,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  avoider: {
+  sheet: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
-  },
-  sheet: {
     maxHeight: '75%',
     backgroundColor: COLORS.surfaceRaised,
     borderTopLeftRadius: SIZES.radius.lg,
