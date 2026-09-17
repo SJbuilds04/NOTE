@@ -1,8 +1,9 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { TrackRow } from '../components/lists/TrackRow';
+import { AddToPlaylistSheet } from '../components/lists/AddToPlaylistSheet';
 import { MiniPlayer } from '../components/player/MiniPlayer';
 import { StatusBarScrim } from '../components/common/StatusBarScrim';
 import { GlassCard } from '../components/common/GlassCard';
@@ -76,6 +77,7 @@ export default function HistoryScreen() {
       <TrackRow
         track={item.track}
         onPress={onPlay}
+        onMorePress={setAddingTrack}
         isPlaying={currentTrack?.id === item.track.id && isPlaying}
       />
     ),
@@ -88,6 +90,9 @@ export default function HistoryScreen() {
     ),
     []
   );
+
+  /** Track whose "add to playlist" sheet is open. */
+  const [addingTrack, setAddingTrack] = useState<Track | null>(null);
 
   return (
     <View style={styles.container}>
@@ -125,6 +130,8 @@ export default function HistoryScreen() {
       )}
 
       <StatusBarScrim />
+
+      <AddToPlaylistSheet track={addingTrack} onClose={() => setAddingTrack(null)} />
 
       {currentTrack && (
         <MiniPlayer

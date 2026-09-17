@@ -37,6 +37,8 @@ type PlayerContextType = {
   volume: number;
   setVolume: (v: number) => void;
   seekTo: (seconds: number) => void;
+  /** Jump relative to the current position. Negative rewinds. */
+  seekBy: (deltaSeconds: number) => void;
 
   next: () => void;
   previous: () => void;
@@ -441,6 +443,20 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     void playbackEngine.seekTo(seconds);
   }, []);
 
+  /**
+   * Relative seek, matching the +/-10s the lock screen offers.
+   * Clamped to the track so it cannot run past either end.
+   */
+  const seekBy = useCallback(
+    (deltaSeconds: number) => {
+      const total = status.duration || currentTrack?.duration || 0;
+      const target = status.position + deltaSeconds;
+      const clamped = total > 0 ? Math.min(total, Math.max(0, target)) : Math.max(0, target);
+      void playbackEngine.seekTo(clamped);
+    },
+    [status.position, status.duration, currentTrack?.duration]
+  );
+
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v));
     playbackEngine.setVolume(clamped);
@@ -582,6 +598,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       volume,
       setVolume,
       seekTo,
+      seekBy,
 
       next,
       previous,
@@ -620,6 +637,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       volume,
       setVolume,
       seekTo,
+      seekBy,
       next,
       previous,
       queueSnapshot,

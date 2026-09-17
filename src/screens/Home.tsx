@@ -14,6 +14,7 @@ import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { Pill } from '../components/common/Pill';
 import { GlassCard } from '../components/common/GlassCard';
 import { TrackRow } from '../components/lists/TrackRow';
+import { AddToPlaylistSheet } from '../components/lists/AddToPlaylistSheet';
 import { Track } from '../core/types';
 import { FEATURED_QUERY } from '../data/catalog';
 import { usePlayer } from '../hooks/usePlayer';
@@ -119,6 +120,9 @@ export default function HomeScreen() {
     [playTrack, listTracks, hasRecents]
   );
 
+  /** Track whose "add to playlist" sheet is open. */
+  const [addingTrack, setAddingTrack] = useState<Track | null>(null);
+
   return (
     <View style={styles.container}>
       {/* Pinned: greeting + search stay put while the rest of the page scrolls. */}
@@ -213,6 +217,7 @@ export default function HomeScreen() {
                 key={track.id}
                 track={track}
                 onPress={handleTrackPress}
+                onMorePress={setAddingTrack}
                 isPlaying={currentTrack?.id === track.id && isPlaying}
               />
             ))
@@ -233,6 +238,8 @@ export default function HomeScreen() {
       </ScrollView>
 
       <StatusBarScrim />
+
+      <AddToPlaylistSheet track={addingTrack} onClose={() => setAddingTrack(null)} />
 
       {currentTrack && (
         <MiniPlayer

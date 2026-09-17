@@ -287,13 +287,13 @@ export class PlaybackEngine {
     };
 
     try {
-      if (this.lockScreenActive) {
-        // Already attached: just swap the metadata, so the session (and the
-        // notification) is not torn down and rebuilt on every track change.
-        this.player?.updateLockScreenMetadata(metadata);
-        return;
-      }
-
+      // Always go through setActiveForLockScreen, even when already attached.
+      //
+      // updateLockScreenMetadata only applies when the playback service is
+      // already BOUND -- while it is still BINDING it logs a warning and drops
+      // the metadata on the floor. setActiveForLockScreen stores it either way
+      // and re-applies it once the service connects, so a track change during
+      // the bind window cannot leave the notification stuck on an older track.
       this.player?.setActiveForLockScreen(true, metadata, {
         showSeekForward: true,
         showSeekBackward: true,
