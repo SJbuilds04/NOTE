@@ -38,5 +38,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web"
   },
-  "private": true
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "author": "Sanyam Jain"
 }

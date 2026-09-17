@@ -47,7 +47,8 @@
       ],
       "expo-asset",
       "./plugins/withCoreLibraryDesugaring",
-      "./plugins/withArm64Only"
+      "./plugins/withAndroidAbis",
+      "./plugins/withReleaseSigning"
     ]
   }
 }

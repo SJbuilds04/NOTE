@@ -32,23 +32,12 @@ only the extractor library.
 is original NØTE code written against the extractor's public `Downloader`
 abstract class. It is not derived from NewPipe's own `DownloaderImpl`.
 
-### ⚠️ Licensing consequence — unresolved
+### Licensing consequence — resolved
 
-GPL-3.0-or-later is a copyleft license. Linking it into NØTE means that **the
-combined work, when distributed, falls under GPL-3.0-or-later**. The MIT text
-currently in this repository's root `LICENSE` file does not describe that
-combined work.
-
-This has **not** been resolved. The root `LICENSE` was deliberately left
-untouched pending an explicit decision by the project owner. The options are:
-
-1. Relicense NØTE as GPL-3.0-or-later (what distributing this combination
-   requires).
-2. Remove the NewPipe Extractor dependency and resolve streams another way.
-3. Keep the integration local/private and never distribute the combined binary.
-
-Until one of these is chosen, **do not publish or distribute builds of NØTE
-that contain this dependency.**
+GPL-3.0-or-later is a copyleft license, so the combined work is also
+GPL-3.0-or-later. NØTE is therefore licensed GPL-3.0-or-later; see the root
+`LICENSE` file. The MIT text that previously sat there came from the Expo
+project template and did not describe this combined work.
 
 ### Transitive dependencies
 
