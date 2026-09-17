@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -12,6 +12,7 @@ import { ChevronLeft, Play, Shuffle, ListPlus } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { TrackRow } from '../components/lists/TrackRow';
+import { AddToPlaylistSheet } from '../components/lists/AddToPlaylistSheet';
 import { MiniPlayer } from '../components/player/MiniPlayer';
 import { GlassCard } from '../components/common/GlassCard';
 import { Track } from '../core/types';
@@ -45,6 +46,9 @@ export default function PlaylistDetailScreen() {
     shuffle,
     toggleShuffle,
   } = usePlayer();
+
+  /** Track whose "add to playlist" sheet is open. */
+  const [addingTrack, setAddingTrack] = useState<Track | null>(null);
 
   const playlist = useMemo(
     () => (playlistId === 'liked' ? likedPlaylist : playlists.find((p) => p.id === playlistId)),
@@ -85,6 +89,7 @@ export default function PlaylistDetailScreen() {
       <TrackRow
         track={item}
         onPress={onTrackPress}
+        onMorePress={setAddingTrack}
         isPlaying={currentTrack?.id === item.id && isPlaying}
       />
     ),
@@ -187,6 +192,8 @@ export default function PlaylistDetailScreen() {
       >
         <ChevronLeft color={COLORS.text.primary} size={28} />
       </TouchableOpacity>
+
+      <AddToPlaylistSheet track={addingTrack} onClose={() => setAddingTrack(null)} />
 
       {currentTrack && (
         <MiniPlayer

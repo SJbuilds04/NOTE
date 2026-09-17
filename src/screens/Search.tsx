@@ -15,6 +15,7 @@ import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { Pill } from '../components/common/Pill';
 import { GlassCard } from '../components/common/GlassCard';
 import { TrackRow } from '../components/lists/TrackRow';
+import { AddToPlaylistSheet } from '../components/lists/AddToPlaylistSheet';
 import { MiniPlayer } from '../components/player/MiniPlayer';
 import { StatusBarScrim } from '../components/common/StatusBarScrim';
 import { BROWSE_CATEGORIES } from '../data/catalog';
@@ -165,6 +166,9 @@ export default function SearchScreen() {
     [onOpenCollection]
   );
 
+  /** Track whose "add to playlist" sheet is open. */
+  const [addingTrack, setAddingTrack] = useState<Track | null>(null);
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -264,6 +268,7 @@ export default function SearchScreen() {
                       key={track.id}
                       track={track}
                       onPress={onPlayTrack}
+                      onMorePress={setAddingTrack}
                       isPlaying={currentTrack?.id === track.id && isPlaying}
                     />
                   ))}
@@ -323,6 +328,8 @@ export default function SearchScreen() {
       </ScrollView>
 
       <StatusBarScrim />
+
+      <AddToPlaylistSheet track={addingTrack} onClose={() => setAddingTrack(null)} />
 
       {currentTrack && (
         <MiniPlayer

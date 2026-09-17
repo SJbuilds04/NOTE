@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, MoreHorizontal, Heart, Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, MonitorSpeaker, Share, ListMusic, X } from 'lucide-react-native';
+import { ChevronDown, MoreHorizontal, Heart, Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, RotateCcw, RotateCw, MonitorSpeaker, Share, ListMusic, X } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
@@ -43,6 +43,7 @@ export default function NowPlayingScreen() {
     error,
     retry,
     seekTo,
+    seekBy,
     next,
     previous,
     shuffle,
@@ -130,6 +131,18 @@ export default function NowPlayingScreen() {
             <Text style={styles.errorHint}>Tap to retry</Text>
           </TouchableOpacity>
         )}
+
+        {/* Relative seek, mirroring the lock-screen +/-10s buttons. */}
+        <View style={styles.seekRow}>
+          <TouchableOpacity style={styles.seekButton} onPress={() => seekBy(-10)}>
+            <RotateCcw color={COLORS.text.secondary} size={22} />
+            <Text style={styles.seekLabel}>10</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.seekButton} onPress={() => seekBy(10)}>
+            <RotateCw color={COLORS.text.secondary} size={22} />
+            <Text style={styles.seekLabel}>10</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Main Controls */}
         <View style={styles.controlsContainer}>
@@ -296,6 +309,25 @@ const styles = StyleSheet.create({
   trackArtist: {
     fontFamily: FONTS.regular,
     fontSize: 16,
+    color: COLORS.text.secondary,
+  },
+  seekRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SIZES.xxl,
+    marginBottom: SIZES.md,
+  },
+  seekButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.xs,
+    paddingVertical: SIZES.xs,
+    paddingHorizontal: SIZES.sm,
+  },
+  seekLabel: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
     color: COLORS.text.secondary,
   },
   controlsContainer: {
