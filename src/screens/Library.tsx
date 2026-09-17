@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   Image,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, X, Trash2 } from 'lucide-react-native';
@@ -46,10 +47,12 @@ export default function LibraryScreen() {
     clearImportError,
     deletePlaylist,
     touchPlaylist,
+    createPlaylist,
   } = useLibrary();
 
   const [showImport, setShowImport] = useState(false);
   const [importUrl, setImportUrl] = useState('');
+  const [newPlaylistName, setNewPlaylistName] = useState('');
   /** Playlists have their own page, so a tap navigates rather than expanding. */
   const openPlaylist = useCallback(
     (playlist: Playlist) => {
@@ -106,6 +109,18 @@ export default function LibraryScreen() {
     playTrack(playlist.tracks[0], { tracks: playlist.tracks, label: playlist.name });
   };
 
+  /** Create an empty playlist, then open its page so it can be filled. */
+  const onCreatePlaylist = () => {
+    const name = newPlaylistName.trim();
+    if (!name) return;
+
+    const playlist = createPlaylist(name);
+    setNewPlaylistName('');
+    setShowImport(false);
+    Keyboard.dismiss();
+    navigation.navigate('Playlist', { playlistId: playlist.id });
+  };
+
   const onImport = async () => {
     const url = importUrl.trim();
     if (!url) return;
@@ -147,6 +162,32 @@ export default function LibraryScreen() {
 
         {showImport && (
           <GlassCard intensity={20} style={styles.importCard}>
+            <Text style={styles.importTitle}>New playlist</Text>
+            <View style={styles.importRow}>
+              <TextInput
+                style={styles.importInput}
+                placeholder="Playlist name"
+                placeholderTextColor={COLORS.text.muted}
+                value={newPlaylistName}
+                onChangeText={setNewPlaylistName}
+                onSubmitEditing={onCreatePlaylist}
+                returnKeyType="done"
+                maxLength={60}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.importButton,
+                  !newPlaylistName.trim() && styles.importButtonDisabled,
+                ]}
+                onPress={onCreatePlaylist}
+                disabled={!newPlaylistName.trim()}
+              >
+                <Text style={styles.importButtonText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.panelDivider} />
+
             <Text style={styles.importTitle}>Import a public playlist</Text>
             <View style={styles.importRow}>
               <TextInput
@@ -397,6 +438,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.text.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  importButtonDisabled: {
+    opacity: 0.4,
+  },
+  panelDivider: {
+    height: 1,
+    backgroundColor: COLORS.glassBorder,
+    marginVertical: SIZES.md,
   },
   importButtonText: {
     fontFamily: FONTS.medium,

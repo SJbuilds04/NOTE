@@ -9,14 +9,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, Play, Heart, Compass, Moon, Target } from 'lucide-react-native';
+import { Search, Play, Heart, Compass, Moon, Target, User } from 'lucide-react-native';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { Pill } from '../components/common/Pill';
 import { GlassCard } from '../components/common/GlassCard';
 import { TrackRow } from '../components/lists/TrackRow';
 import { AddToPlaylistSheet } from '../components/lists/AddToPlaylistSheet';
 import { Track } from '../core/types';
-import { FEATURED_QUERY } from '../data/catalog';
+import { FEATURED_QUERY, randomQueryFor } from '../data/catalog';
 import { usePlayer } from '../hooks/usePlayer';
 import { useLibrary } from '../hooks/useLibrary';
 import { MusicService } from '../services/MusicService';
@@ -78,7 +78,11 @@ export default function HomeScreen() {
 
   const runAction = useCallback(
     async (action: (typeof ACTIONS)[number]) => {
-      if (action.query === null) {
+      // A fresh query each tap, so Discover/Chill/Focus do not replay the
+      // same results every time.
+      const query = randomQueryFor(action.id) ?? action.query;
+
+      if (query === null) {
         // Liked: play straight from the local library, no network needed.
         if (liked.length) playTrack(liked[0], { tracks: liked, label: 'Liked Songs' });
         return;
@@ -86,9 +90,15 @@ export default function HomeScreen() {
 
       setPendingAction(action.id);
       try {
-        const results = await MusicService.search(action.query, { limit: 25 });
+        const results = await MusicService.search(query, { limit: 25 });
         if (results.tracks.length) {
-          playTrack(results.tracks[0], { tracks: results.tracks, label: action.label });
+          // Shuffle so even a repeated query starts somewhere else.
+          const shuffled = [...results.tracks];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          playTrack(shuffled[0], { tracks: shuffled, label: action.label });
         }
       } catch {
         // Silent: the tile simply stops spinning.
@@ -132,10 +142,9 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>{greetingFor(new Date().getHours())}</Text>
             {!!profile.name && <Text style={styles.name}>{profile.name}.</Text>}
           </View>
-          <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop' }}
-            style={styles.avatar}
-          />
+          <View style={styles.avatar}>
+            <User color={COLORS.text.secondary} size={26} />
+          </View>
         </View>
 
         <TouchableOpacity
@@ -290,7 +299,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.surfaceRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
   },
   searchBar: {
     flexDirection: 'row',

@@ -10,12 +10,14 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, MoreHorizontal, Heart, Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, RotateCcw, RotateCw, MonitorSpeaker, Share, ListMusic, X } from 'lucide-react-native';
+import { ChevronDown, Heart, Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Shuffle, RotateCcw, RotateCw, MonitorSpeaker, Share, ListMusic, ListPlus, X } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { PlaybackSourceSheet } from '../components/player/PlaybackSourceSheet';
 import { SeekBar } from '../components/player/SeekBar';
+import { AddToPlaylistSheet } from '../components/lists/AddToPlaylistSheet';
+import { Track } from '../core/types';
 import { usePlayer } from '../hooks/usePlayer';
 import { useLibrary } from '../hooks/useLibrary';
 import { useNavigation } from '@react-navigation/native';
@@ -60,6 +62,8 @@ export default function NowPlayingScreen() {
   const { isLiked, toggleLike } = useLibrary();
   const [showQueue, setShowQueue] = useState(false);
   const [showSource, setShowSource] = useState(false);
+  /** Track whose "add to playlist" sheet is open. */
+  const [addingTrack, setAddingTrack] = useState<Track | null>(null);
 
   if (!currentTrack) return null;
 
@@ -94,8 +98,13 @@ export default function NowPlayingScreen() {
               {queueContext || 'NØTE'}
             </Text>
           </View>
-          <TouchableOpacity style={styles.headerIcon} onPress={() => setShowQueue((v) => !v)}>
-            <MoreHorizontal color={COLORS.text.primary} size={24} />
+          {/* Up Next already has its own toggle in the bottom row, so this
+              opens "add to playlist" rather than duplicating it. */}
+          <TouchableOpacity
+            style={styles.headerIcon}
+            onPress={() => setAddingTrack(currentTrack)}
+          >
+            <ListPlus color={COLORS.text.primary} size={24} />
           </TouchableOpacity>
         </View>
 
@@ -233,6 +242,8 @@ export default function NowPlayingScreen() {
         )}
 
       </View>
+
+      <AddToPlaylistSheet track={addingTrack} onClose={() => setAddingTrack(null)} />
 
       <PlaybackSourceSheet visible={showSource} onClose={() => setShowSource(false)} />
     </View>
