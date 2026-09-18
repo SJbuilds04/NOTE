@@ -143,9 +143,14 @@ export default function HomeScreen() {
             {!!profile.name && <Text style={styles.name}>{profile.name}.</Text>}
             <Text style={styles.madeBy}>MADE BY SJBUILDS</Text>
           </View>
-          <View style={styles.avatar}>
+          <TouchableOpacity
+            style={styles.avatar}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Settings' as never)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <User color={COLORS.text.secondary} size={26} />
-          </View>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
