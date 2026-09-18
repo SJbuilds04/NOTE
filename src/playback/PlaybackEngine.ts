@@ -61,6 +61,10 @@ export class PlaybackEngine {
   private configured = false;
   /** Whether the media session/notification is currently attached. */
   private lockScreenActive = false;
+  /** Track the notification is currently showing. */
+  private lockScreenTrack: Track | null = null;
+  /** Whether metadata has been re-asserted since playback actually began. */
+  private lockScreenSynced = false;
 
   on<K extends keyof EngineEvents>(event: K, handler: EngineEvents[K]): void {
     this.listeners[event] = handler;
@@ -136,6 +140,10 @@ export class PlaybackEngine {
 
     this.listeners.onStatus?.(this.status);
 
+    // Once the source is genuinely playing, the service is bound and the
+    // notification will accept metadata.
+    if (s?.isLoaded && s?.playing) this.syncLockScreenOnce();
+
     // `didJustFinish` can repeat across updates; fire completion only once.
     if (s?.didJustFinish && !this.completionFired) {
       this.completionFired = true;
@@ -169,7 +177,9 @@ export class PlaybackEngine {
       this.status = { ...IDLE_STATUS, isBuffering: true, volume: this.desiredVolume };
       this.listeners.onStatus?.(this.status);
 
-      player.replace({ uri: stream.url });
+      // Headers matter: a googlevideo URL fetched with a different User-Agent
+      // than the one that extracted it comes back 403.
+      player.replace({ uri: stream.url, headers: stream.headers });
       player.volume = this.desiredVolume;
 
       // If the source never loads, surface a real error instead of hanging.
@@ -271,34 +281,41 @@ export class PlaybackEngine {
   /**
    * Native lock-screen / notification controls.
    *
-   * expo-audio owns the single MediaSession; NØTE must not create a second one.
-   * Play/pause, the scrub bar and seek +/-10s are handled inside that session
-   * and act directly on this same player, so the engine stays the one source of
-   * truth and no command has to round-trip through JS.
+   * expo-audio owns the single MediaSession; NØTE must not create a second
+   * one. Play/pause, the scrub bar and seek +/-10s act directly on this same
+   * player, so the engine stays the one source of truth.
    *
-   * Next/previous are deliberately absent: expo-audio's AudioMediaSessionCallback
-   * removes COMMAND_SEEK_TO_NEXT / COMMAND_SEEK_TO_PREVIOUS (and the MEDIA_ITEM
-   * variants) from the session, and exposes no JS event for them. See the
-   * limitation noted in the Phase 3 report.
+   * Attaching and updating are deliberately different calls:
+   *
+   *   setActiveForLockScreen  rebuilds the MediaSession from scratch
+   *                           (AudioControlsService.setPlayerOptions releases
+   *                           the session and builds a new one)
+   *   updateLockScreenMetadata swaps the metadata on the live session
+   *
+   * So attach runs once. Calling it per track looked like it fixed stale
+   * titles, but it rebuilt the session at the instant each track started --
+   * when position and duration are still 0 -- leaving the notification stuck
+   * at 00:00 with a dead progress bar.
+   *
+   * Next/previous are absent because expo-audio’s AudioMediaSessionCallback
+   * removes COMMAND_SEEK_TO_NEXT / COMMAND_SEEK_TO_PREVIOUS from the session
+   * and exposes no JS event for them.
    */
   private setLockScreenMetadata(track: Track): void {
     if (Platform.OS === 'web') return;
 
-    const metadata = {
-      title: track.title,
-      artist: track.artist.name,
-      albumTitle: track.album,
-      artworkUrl: track.albumImageUrl || undefined,
-    };
+    this.lockScreenTrack = track;
+    this.lockScreenSynced = false;
+
+    const metadata = this.metadataFor(track);
 
     try {
-      // Always go through setActiveForLockScreen, even when already attached.
-      //
-      // updateLockScreenMetadata only applies when the playback service is
-      // already BOUND -- while it is still BINDING it logs a warning and drops
-      // the metadata on the floor. setActiveForLockScreen stores it either way
-      // and re-applies it once the service connects, so a track change during
-      // the bind window cannot leave the notification stuck on an older track.
+      if (this.lockScreenActive) {
+        // Live session: swap metadata in place, keeping position/duration.
+        this.player?.updateLockScreenMetadata(metadata);
+        return;
+      }
+
       this.player?.setActiveForLockScreen(true, metadata, {
         showSeekForward: true,
         showSeekBackward: true,
@@ -309,6 +326,39 @@ export class PlaybackEngine {
     }
   }
 
+  private metadataFor(track: Track) {
+    return {
+      title: track.title,
+      artist: track.artist.name,
+      albumTitle: track.album,
+      artworkUrl: track.albumImageUrl || undefined,
+    };
+  }
+
+  /**
+   * Re-assert metadata once the source is actually playing.
+   *
+   * updateLockScreenMetadata only applies while the playback service is
+   * BOUND; during BINDING it logs a warning and discards the metadata. That
+   * window is what previously left the notification showing an older track.
+   * Re-sending once playback has genuinely started closes it, and is driven
+   * by a real event rather than a guessed delay. It is a metadata swap, not
+   * a session rebuild, so the progress bar keeps running.
+   */
+  private syncLockScreenOnce(): void {
+    if (Platform.OS === 'web') return;
+    if (this.lockScreenSynced || !this.lockScreenActive) return;
+
+    const track = this.lockScreenTrack;
+    if (!track) return;
+
+    this.lockScreenSynced = true;
+    try {
+      this.player?.updateLockScreenMetadata(this.metadataFor(track));
+    } catch {
+      /* best effort */
+    }
+  }
   /** Tear down the notification/session when playback is genuinely over. */
   private clearLockScreen(): void {
     if (Platform.OS === 'web' || !this.lockScreenActive) return;
@@ -319,6 +369,8 @@ export class PlaybackEngine {
       /* best effort */
     }
     this.lockScreenActive = false;
+    this.lockScreenTrack = null;
+    this.lockScreenSynced = false;
   }
 
   get trackId(): string | null {

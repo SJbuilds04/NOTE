@@ -93,6 +93,16 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [status, setStatus] = useState<PlaybackStatus>(IDLE_STATUS);
+  /**
+   * Mirror of  for callbacks that only READ it.
+   *
+   * Position ticks ~4x a second. A callback that lists status.position in its
+   * deps is rebuilt just as often, and because these callbacks sit in the
+   * context value, that rebuilt the whole value 4x a second -- re-rendering
+   * every screen using usePlayer and undoing the progress isolation.
+   */
+  const statusRef = useRef<PlaybackStatus>(IDLE_STATUS);
+  statusRef.current = status;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -428,7 +438,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const previous = useCallback(() => {
     // Standard behaviour: restart the track if we are more than 3s in.
-    if (status.position > 3) {
+    if (statusRef.current.position > 3) {
       void playbackEngine.seekTo(0);
       return;
     }
@@ -437,7 +447,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     bumpQueue();
     persistQueue();
     void loadCurrent({ autoPlay: true });
-  }, [bumpQueue, loadCurrent, persistQueue, status.position]);
+  }, [bumpQueue, loadCurrent, persistQueue]);
 
   const seekTo = useCallback((seconds: number) => {
     void playbackEngine.seekTo(seconds);
@@ -449,12 +459,13 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
    */
   const seekBy = useCallback(
     (deltaSeconds: number) => {
-      const total = status.duration || currentTrack?.duration || 0;
-      const target = status.position + deltaSeconds;
+      const { duration, position } = statusRef.current;
+      const total = duration || currentTrack?.duration || 0;
+      const target = position + deltaSeconds;
       const clamped = total > 0 ? Math.min(total, Math.max(0, target)) : Math.max(0, target);
       void playbackEngine.seekTo(clamped);
     },
-    [status.position, status.duration, currentTrack?.duration]
+    [currentTrack?.duration]
   );
 
   const setVolume = useCallback((v: number) => {

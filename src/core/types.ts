@@ -122,6 +122,13 @@ export type ResolvedStream = {
   /** Epoch ms after which the URL should be treated as stale. */
   expiresAt: number;
   resolvedBy: string;
+  /**
+   * Headers the player must send when fetching this URL.
+   *
+   * googlevideo URLs are tied to the client that extracted them: fetching one
+   * with a different User-Agent than the extractor used returns HTTP 403.
+   */
+  headers?: Record<string, string>;
 };
 
 export type RepeatMode = 'off' | 'all' | 'one';

@@ -111,7 +111,10 @@ class NoteNativeModule : Module() {
         "title" to info.name,
         "uploader" to info.uploaderName,
         "streamType" to info.streamType.name,
-        "extractor" to "NewPipeExtractor/v0.26.5"
+        "extractor" to "NewPipeExtractor/v0.26.5",
+        // googlevideo ties a stream URL to the client that asked for it, so the
+        // player has to fetch it with the same User-Agent or it gets a 403.
+        "userAgent" to NoteNativeDownloader.USER_AGENT
       )
     } catch (e: Throwable) {
       classify(e)
