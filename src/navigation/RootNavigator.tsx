@@ -7,6 +7,7 @@ import { useLibrary } from '../hooks/useLibrary';
 import OnboardingScreen from '../screens/Onboarding';
 import ProfileSetupScreen from '../screens/ProfileSetup';
 import PlaylistDetailScreen from '../screens/PlaylistDetail';
+import SettingsScreen from '../screens/Settings';
 import NowPlayingScreen from '../screens/NowPlaying';
 
 const Stack = createNativeStackNavigator();
@@ -36,6 +37,7 @@ export const RootNavigator = () => {
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         <Stack.Screen name="Main" component={TabNavigator} />
         <Stack.Screen name="Playlist" component={PlaylistDetailScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen 
           name="NowPlaying" 
           component={NowPlayingScreen} 
