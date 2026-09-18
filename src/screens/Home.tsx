@@ -141,6 +141,7 @@ export default function HomeScreen() {
           <View>
             <Text style={styles.greeting}>{greetingFor(new Date().getHours())}</Text>
             {!!profile.name && <Text style={styles.name}>{profile.name}.</Text>}
+            <Text style={styles.madeBy}>MADE BY SJBUILDS</Text>
           </View>
           <View style={styles.avatar}>
             <User color={COLORS.text.secondary} size={26} />
@@ -284,6 +285,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: SIZES.lg,
+  },
+  madeBy: {
+    fontFamily: FONTS.medium,
+    fontSize: 9,
+    letterSpacing: 2.5,
+    color: COLORS.text.muted,
+    marginTop: SIZES.xs,
   },
   greeting: {
     fontFamily: FONTS.regular,

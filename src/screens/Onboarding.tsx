@@ -57,6 +57,7 @@ export default function OnboardingScreen() {
           
           <Text style={styles.footerText}>LISTEN FREELY.</Text>
           <Text style={styles.footerText}>LIVE FULLY.</Text>
+          <Text style={styles.madeBy}>MADE BY SJBUILDS</Text>
         </View>
       </View>
     </View>
@@ -154,6 +155,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  madeBy: {
+    fontFamily: FONTS.medium,
+    fontSize: 10,
+    letterSpacing: 3,
+    color: COLORS.text.muted,
+    marginTop: SIZES.md,
+    opacity: 0.8,
   },
   footerText: {
     fontFamily: FONTS.medium,
