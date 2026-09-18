@@ -41,6 +41,8 @@ export type NativeStreamSuccess = {
   streamType?: string;
   /** Which extractor produced this, for diagnostics. */
   extractor?: string;
+  /** User-Agent the URL was extracted with; the player must reuse it. */
+  userAgent?: string;
 };
 
 export type NativeStreamFailure = {

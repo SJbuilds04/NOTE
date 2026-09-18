@@ -20,7 +20,7 @@ import java.util.zip.GZIPInputStream
  */
 class NoteNativeDownloader : Downloader() {
 
-  private companion object {
+  companion object {
     /**
      * YouTube serves different player payloads per client. A desktop UA keeps
      * the extractor on the code path it is written and tested against.

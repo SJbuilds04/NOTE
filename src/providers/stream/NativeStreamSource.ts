@@ -17,6 +17,17 @@ import { StreamSource } from './StreamResolver';
  * endpoints as before.
  */
 
+/**
+ * Mirrors NoteNativeDownloader.USER_AGENT.
+ *
+ * The native module reports the User-Agent it extracted with, and that is
+ * the authoritative value. This fallback covers binaries built before that
+ * field existed, so playback does not 403 on an older APK.
+ */
+const FALLBACK_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+
 /** How long a resolved URL is trusted before we re-resolve it. */
 const STREAM_TTL = 4 * 60 * 60 * 1000; // 4h
 
@@ -121,6 +132,8 @@ export class NativeStreamSource implements StreamSource {
       bitrate: result.bitrate,
       expiresAt: expiryFor(result.url),
       resolvedBy: this.id,
+      // Replay the extractor’s User-Agent when fetching, or googlevideo 403s.
+      headers: { 'User-Agent': result.userAgent ?? FALLBACK_USER_AGENT },
     };
   }
 }
