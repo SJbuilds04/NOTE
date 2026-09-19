@@ -14,6 +14,24 @@ No account. No ads. No backend. No tracking.
 
 ---
 
+<div align="center">
+
+<a href="https://github.com/SJbuilds04/NOTE/releases/latest">
+  <img src="docs/preview.jpg" alt="NØTE — search, queue, and play with the screen off" width="820">
+</a>
+
+<!-- To replace this still with the inline showcase video:
+     1. Open any GitHub issue or comment box on this repo
+     2. Drag brag.mp4 into it -- GitHub uploads it and gives you a URL like
+        https://github.com/user-attachments/assets/<uuid>
+     3. Delete the <a>...</a> block above and paste that bare URL on its own
+        line here. GitHub renders it as an inline video player.
+     Do NOT commit the mp4 itself -- it bundles a third-party music track. -->
+
+</div>
+
+---
+
 ## What it is
 
 NØTE is a free, open-source music player. You search for a song, tap it, and it plays —
