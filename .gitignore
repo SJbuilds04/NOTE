@@ -47,3 +47,11 @@ modules/*/android/.cxx/
 # Release signing material -- never commit these
 *.keystore
 credentials/
+
+# Brag/showcase video output. Contains a bundled third-party music track whose
+# redistribution terms are not verified here -- publish the rendered MP4 as a
+# release asset or on social instead of committing the raw project assets.
+brag-output/
+
+# Gradle build cache inside local Expo modules
+modules/*/android/.gradle/

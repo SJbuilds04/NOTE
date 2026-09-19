@@ -44,3 +44,27 @@ project template and did not describe this combined work.
 NewPipe Extractor pulls in further libraries under their own licenses,
 including `nanojson` (MIT), `jsoup` (MIT) and Mozilla `Rhino` (MPL-2.0).
 Their terms apply independently and are unaffected by this file.
+
+---
+
+## Expo module template
+
+`modules/note-native/` was scaffolded with `npx create-expo-module --local`. The
+generated directory structure and boilerplate come from a template distributed
+by Expo (© 650 Industries, Inc.) under the **MIT License**.
+
+That MIT notice is reproduced in `modules/note-native/LICENSE` in acknowledgement
+of the scaffold's origin. It covers the generated boilerplate only. The original
+NØTE code in that directory — including `NoteNativeModule.kt` and
+`NoteNativeDownloader.kt` — is the work of Sanyam Jain and is licensed
+GPL-3.0-or-later along with the rest of this project.
+
+---
+
+## Application framework
+
+Expo, React Native, React Navigation, `lucide-react-native`, and the other
+JavaScript dependencies declared in `package.json` are used unmodified under
+their own licenses, predominantly **MIT**. Their terms apply independently.
+Run `npm ls --all` for the resolved dependency tree, or consult each package's
+own `LICENSE` file under `node_modules/`.
