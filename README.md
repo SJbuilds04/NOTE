@@ -121,7 +121,8 @@ Please read this section before using, building, or redistributing NØTE.
 ## License
 
 **NØTE is licensed under the GNU General Public License, version 3 or (at your option) any
-later version (GPL-3.0-or-later).** The full text is in [`LICENSE`](LICENSE).
+later version (GPL-3.0-or-later).** The full license text is in [`LICENSE`](LICENSE); the
+project copyright notice is in [`COPYRIGHT`](COPYRIGHT).
 
 ```
 NØTE — a music player for Android
